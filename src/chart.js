@@ -1,4 +1,5 @@
-import { circle, computeBoundaries, isOver, line } from "./utils";
+import { tooltip } from "./tooltip";
+import { circle, computeBoundaries, isOver, line, css } from "./utils";
 
 const PADDING = 40;
 const WIDTH = 600;
@@ -10,11 +11,15 @@ const VIEW_HEIGHT = DPI_HEIGHT - PADDING * 2;
 const VIEW_WIDTH = DPI_WIDTH;
 const CIRCLE_RADIUS = 5;
 
-export function chart(canvas, data) {
+export function chart(root, data) {
+  const canvas = root.querySelector("canvas");
+  const tip = tooltip(root.querySelector('[data-el="tooltip"]'));
   let raf;
   const ctx = canvas.getContext("2d");
-  canvas.style.width = WIDTH + "px";
-  canvas.style.height = HEIGHT + "px";
+  css(canvas, {
+    width: WIDTH + "px",
+    height: HEIGHT + "px",
+  });
   canvas.width = DPI_WIDTH;
   canvas.height = DPI_HEIGHT;
 
@@ -33,21 +38,26 @@ export function chart(canvas, data) {
   canvas.addEventListener("mouseleave", mouseleave);
 
   function mousemove({ clientX, clientY }) {
-    const { left } = canvas.getBoundingClientRect();
+    const { left, top } = canvas.getBoundingClientRect();
     proxy.mouse = {
       x: (clientX - left) * 2,
+      tooltip: {
+        left: clientX - left,
+        top: clientY - top,
+      },
     };
   }
 
   function mouseleave() {
     proxy.mouse = null;
+    tip.hide();
   }
 
   function clear() {
     ctx.clearRect(0, 0, DPI_WIDTH, DPI_HEIGHT);
   }
 
-  function xAxis(xData, xRatio) {
+  function xAxis(xData, yData, xRatio) {
     const colsCount = 6;
     const step = Math.round(xData.length / colsCount);
     ctx.beginPath();
@@ -67,6 +77,18 @@ export function chart(canvas, data) {
         ctx.moveTo(x, PADDING / 2);
         ctx.lineTo(x, DPI_HEIGHT - PADDING);
         ctx.restore();
+
+        tip.show(proxy.mouse.tooltip, {
+          title: new Date(xData[i]).toLocaleDateString("en", {
+            month: "short",
+            day: "numeric",
+          }),
+          items: yData.map((col) => ({
+            color: data.colors[col[0]],
+            name: data.names[col[0]],
+            value: col[i + 1],
+          })),
+        });
       }
     }
     ctx.stroke();
@@ -102,7 +124,7 @@ export function chart(canvas, data) {
       (col) => data.types[col[0]] !== "line"
     )[0];
     yAxis(yMin, yMax);
-    xAxis(xData, xRatio);
+    xAxis(xData, yData, xRatio);
     yData.map(toCoords(xRatio, yRatio)).forEach((coords, i) => {
       const color = data.colors[yData[i][0]];
       line(ctx, coords, { color });
