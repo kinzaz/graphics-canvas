@@ -1,5 +1,13 @@
+import { sliderChart } from "./slider";
 import { tooltip } from "./tooltip";
-import { circle, computeBoundaries, isOver, line, css } from "./utils";
+import {
+  circle,
+  computeBoundaries,
+  isOver,
+  line,
+  css,
+  toCoords,
+} from "./utils";
 
 const PADDING = 40;
 const WIDTH = 600;
@@ -12,10 +20,15 @@ const VIEW_WIDTH = DPI_WIDTH;
 const CIRCLE_RADIUS = 5;
 
 export function chart(root, data) {
-  const canvas = root.querySelector("canvas");
+  const canvas = root.querySelector('[data-el="main"]');
   const tip = tooltip(root.querySelector('[data-el="tooltip"]'));
-  let raf;
+  const slider = sliderChart(
+    root.querySelector('[data-el="slider"]'),
+    data,
+    DPI_WIDTH
+  );
   const ctx = canvas.getContext("2d");
+  let raf;
   css(canvas, {
     width: WIDTH + "px",
     height: HEIGHT + "px",
@@ -125,17 +138,19 @@ export function chart(root, data) {
     )[0];
     yAxis(yMin, yMax);
     xAxis(xData, yData, xRatio);
-    yData.map(toCoords(xRatio, yRatio)).forEach((coords, i) => {
-      const color = data.colors[yData[i][0]];
-      line(ctx, coords, { color });
+    yData
+      .map(toCoords(xRatio, yRatio, DPI_HEIGHT, PADDING))
+      .forEach((coords, i) => {
+        const color = data.colors[yData[i][0]];
+        line(ctx, coords, { color });
 
-      for (const [x, y] of coords) {
-        if (isOver(proxy.mouse, x, xData.length, DPI_WIDTH)) {
-          circle(ctx, [x, y], color, CIRCLE_RADIUS);
-          break;
+        for (const [x, y] of coords) {
+          if (isOver(proxy.mouse, x, xData.length, DPI_WIDTH)) {
+            circle(ctx, [x, y], color, CIRCLE_RADIUS);
+            break;
+          }
         }
-      }
-    });
+      });
   }
 
   return {
@@ -148,14 +163,4 @@ export function chart(root, data) {
       canvas.removeEventListener("mouseleave", mouseleave);
     },
   };
-}
-
-function toCoords(xRatio, yRatio) {
-  return (col) =>
-    col
-      .map((y, i) => [
-        Math.floor((i - 1) * xRatio),
-        Math.floor(DPI_HEIGHT - PADDING - y * yRatio),
-      ])
-      .filter((_, i) => i !== 0);
 }
